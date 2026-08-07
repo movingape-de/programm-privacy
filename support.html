@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="index, follow">
+<title>Support – programm</title>
+<style>
+  :root {
+    --bg: #f4f3ee;
+    --fg: #1a1a17;
+    --muted: #6b6b63;
+    --accent: #6f7d31;
+    --card: #ffffff;
+    --hairline: #e2e1d8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0b0a;
+      --fg: #f0efe8;
+      --muted: #9a998f;
+      --accent: #97a838;
+      --card: #141412;
+      --hairline: #26251f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    font-size: 17px;
+  }
+  .wrap { max-width: 44rem; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+  .wordmark {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-weight: 700; font-size: 1.6rem; letter-spacing: -0.02em; margin-bottom: 2.5rem;
+  }
+  .wordmark .pro { color: var(--fg); }
+  .wordmark .gramm { color: var(--accent); }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  .sub { color: var(--muted); margin: 0 0 2.5rem; }
+  h2 {
+    font-size: 1.2rem; margin: 2.4rem 0 0.6rem; padding-top: 1.6rem;
+    border-top: 1px solid var(--hairline);
+  }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  p { margin: 0.6rem 0; }
+  strong { font-weight: 650; }
+  a { color: var(--accent); }
+  .card {
+    background: var(--card); border: 1px solid var(--hairline);
+    border-radius: 14px; padding: 1.1rem 1.25rem; margin: 1.2rem 0;
+  }
+  .faq-q { font-weight: 650; margin-top: 1.2rem; }
+  footer {
+    margin-top: 3rem; padding-top: 1.6rem; border-top: 1px solid var(--hairline);
+    color: var(--muted); font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="wordmark"><span class="pro">pro</span><span class="gramm">gramm</span></div>
+
+    <h1>Support</h1>
+    <p class="sub">Hilfe und Kontakt zur iOS-App „programm".</p>
+
+    <div class="card">
+      <p style="margin:0"><strong>Kontakt</strong><br>
+      Schreib uns bei Fragen, Problemen oder Feedback:<br>
+      <a href="mailto:movingape@gmail.com">movingape@gmail.com</a></p>
+    </div>
+
+    <h2>Was macht programm?</h2>
+    <p>programm rechnet Einheitenpreise um und vergleicht sie – Preise pro Gramm, Milliliter, Liter, Stück oder jeder eigenen Einheit. Alles läuft lokal auf deinem Gerät, ohne Konto, ohne Werbung, ohne Tracking.</p>
+
+    <h2>Häufige Fragen</h2>
+
+    <p class="faq-q">Wie lege ich einen Kurs an?</p>
+    <p>Tippe auf das <strong>+</strong> oben rechts und gib Name, Preis und Einheit ein. Auf der Startseite ohne Kurse kannst du mit einem Tipp zwei Beispielkurse laden.</p>
+
+    <p class="faq-q">Wie vergleiche ich Kurse?</p>
+    <p>Tippe oben auf das Vergleichs-Symbol, gib eine Menge ein – der günstigste Kurs wird grün hervorgehoben und die Differenz angezeigt.</p>
+
+    <p class="faq-q">Was ist die verschlüsselte Kombi-Liste?</p>
+    <p>Eine private Merkliste für Kombinationen mehrerer Kurse. Sie wird mit einem aus deinem Passwort abgeleiteten Schlüssel lokal verschlüsselt (AES-GCM). Das Passwort verlässt dein Gerät nicht – ohne Passwort sind die Einträge nicht wiederherstellbar.</p>
+
+    <p class="faq-q">Werden meine Daten übertragen?</p>
+    <p>Nein. Die App speichert alles ausschließlich lokal und benötigt keine Netzwerkverbindung. Details in der <a href="./index.html">Datenschutzerklärung</a>.</p>
+
+    <footer>
+      Verantwortlich: movingape · <a href="mailto:movingape@gmail.com">movingape@gmail.com</a> · <a href="./index.html">Datenschutz</a>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,5 @@
+RewriteEngine On
+RewriteRule ^t/([a-z0-9-]+)$ /t/$1/ [R=301,L]
+RewriteRule ^t/([a-z0-9-]+)/(.*)$ tool.php?slug=$1&path=$2 [B,L]
+
+Options -Indexes

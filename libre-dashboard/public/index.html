@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Libre Dashboard</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1b1f24; --muted: #6a7480; --line: #e3e7ec;
+    --ok: #1f9d6b; --high: #e08a00; --low: #d33f49; --accent: #2563eb; --band: rgba(31,157,107,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1216; --card: #181c22; --text: #e8ecf1; --muted: #8b95a1; --line: #2a303a;
+            --ok: #3ccf91; --high: #f0a63a; --low: #ff6b75; --accent: #6b9bff; --band: rgba(60,207,145,.13); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 1.1rem; margin: 0; }
+  .muted { color: var(--muted); font-size: .875rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .now { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .val { font-size: 4.5rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .arrow { font-size: 2.5rem; }
+  .unit { color: var(--muted); }
+  .in-range { color: var(--ok); } .high { color: var(--high); } .low { color: var(--low); }
+  .banner { padding: 10px 14px; border-radius: 10px; font-size: .9rem; border: 1px solid var(--low); color: var(--low); }
+  .banner.warn { border-color: var(--high); color: var(--high); }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  button { font: inherit; background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+  .stat b { display: block; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+  .tir { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin-top: 8px; background: var(--line); }
+  .tir span { display: block; height: 100%; }
+  svg { width: 100%; height: auto; display: block; touch-action: none; }
+  svg text { fill: var(--muted); font-size: 11px; }
+  #tip { position: absolute; pointer-events: none; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font-size: .8rem; display: none; white-space: nowrap; }
+  .chartwrap { position: relative; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1 id="who">Libre Dashboard</h1>
+      <div class="muted" id="updated">lädt …</div>
+    </div>
+    <label class="muted"><input type="checkbox" id="alarm"> Benachrichtigung bei hoch/tief</label>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <section class="card">
+    <div class="now">
+      <span class="val" id="val">–</span>
+      <span class="arrow" id="arrow"></span>
+      <span class="unit" id="unit"></span>
+    </div>
+    <div class="muted" id="age" style="margin-top:6px"></div>
+  </section>
+
+  <section class="card">
+    <div class="tabs" id="tabs" role="group" aria-label="Zeitraum"></div>
+    <div class="chartwrap" style="margin-top:12px">
+      <svg id="chart" viewBox="0 0 900 320" role="img" aria-label="Glukoseverlauf"></svg>
+      <div id="tip"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="stats">
+      <div class="stat"><span class="muted">Ø Glukose</span><b id="s-avg">–</b></div>
+      <div class="stat"><span class="muted">GMI (≈ HbA1c)</span><b id="s-gmi">–</b></div>
+      <div class="stat"><span class="muted">Variabilität (CV)</span><b id="s-cv">–</b></div>
+      <div class="stat"><span class="muted">Messwerte</span><b id="s-n">–</b></div>
+    </div>
+    <div style="margin-top:16px">
+      <div class="muted">Time in Range <span id="tir-range"></span></div>
+      <div class="tir" id="tir"></div>
+      <div class="muted" id="tir-legend" style="margin-top:6px"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const RANGES = [['3 h', 3], ['6 h', 6], ['12 h', 12], ['24 h', 24], ['7 Tage', 168], ['14 Tage', 336]];
+const ARROWS = { 1: '⬇', 2: '↘', 3: '→', 4: '↗', 5: '⬆' };
+const $ = id => document.getElementById(id);
+let range = Number(localStorage.getItem('range')) || 24;
+let data = null, lastAlert = '';
+
+const fmt = (mgdl, unit, digits) => unit === 'mmol' ? (mgdl / 18.016).toFixed(digits ?? 1) : String(Math.round(mgdl));
+const cls = (v, t) => v < t.low ? 'low' : v > t.high ? 'high' : 'in-range';
+
+$('tabs').innerHTML = RANGES.map(([l, h]) => `<button data-h="${h}" aria-pressed="${h === range}">${l}</button>`).join('');
+$('tabs').onclick = e => {
+  const h = e.target.dataset?.h; if (!h) return;
+  range = Number(h); localStorage.setItem('range', h);
+  for (const b of $('tabs').children) b.setAttribute('aria-pressed', b.dataset.h === h);
+  load();
+};
+$('alarm').checked = localStorage.getItem('alarm') === '1' && 'Notification' in window && Notification.permission === 'granted';
+$('alarm').onchange = async e => {
+  if (e.target.checked && 'Notification' in window && await Notification.requestPermission() !== 'granted') e.target.checked = false;
+  localStorage.setItem('alarm', e.target.checked ? '1' : '0');
+};
+
+async function load() {
+  try {
+    const r = await fetch('/api/glucose?hours=' + range, { cache: 'no-store' });
+    data = await r.json();
+  } catch { data = { ok: false, error: 'Server nicht erreichbar', readings: [] }; }
+  render();
+}
+
+function render() {
+  const d = data, unit = d.unit || 'mgdl', t = d.targets || { low: 70, high: 180 };
+  const banner = $('banner');
+  banner.hidden = true;
+  if (d.demo) { banner.hidden = false; banner.className = 'banner warn'; banner.textContent = 'Demo-Modus: simulierte Werte'; }
+  if (!d.ok) { banner.hidden = false; banner.className = 'banner'; banner.textContent = d.error || 'Fehler'; }
+
+  $('who').textContent = d.patient ? `Glukose von ${d.patient}` : 'Libre Dashboard';
+  $('unit').textContent = unit === 'mmol' ? 'mmol/L' : 'mg/dL';
+  $('updated').textContent = d.updated ? `Abgefragt ${new Date(d.updated).toLocaleTimeString('de-DE')}` : '';
+
+  const c = d.current;
+  if (c) {
+    $('val').textContent = fmt(c.mgdl, unit);
+    $('val').className = 'val ' + cls(c.mgdl, t);
+    $('arrow').textContent = ARROWS[c.trend] || '';
+    const min = Math.round((Date.now() - c.t) / 60000);
+    $('age').textContent = `Messung vor ${min} min`;
+    if (min > 15 && d.ok) { banner.hidden = false; banner.className = 'banner warn'; banner.textContent = `Letzter Wert ist ${min} min alt. Sensor oder Verbindung prüfen.`; }
+    maybeAlert(c, t, unit);
+  }
+  drawChart(d.readings, t, unit);
+  drawStats(d.readings, t);
+}
+
+function maybeAlert(c, t, unit) {
+  if (!$('alarm').checked || document.hidden === undefined) return;
+  const state = c.mgdl < t.low ? 'low' : c.mgdl > t.high ? 'high' : '';
+  if (state && state !== lastAlert && Notification.permission === 'granted')
+    new Notification(state === 'low' ? 'Glukose zu niedrig' : 'Glukose zu hoch', { body: `${fmt(c.mgdl, unit)} ${unit === 'mmol' ? 'mmol/L' : 'mg/dL'} ${ARROWS[c.trend] || ''}` });
+  lastAlert = state;
+}
+
+function drawChart(rd, t, unit) {
+  const svg = $('chart'), W = 900, H = 320, L = 44, R = 12, T = 10, B = 26;
+  if (!rd.length) { svg.innerHTML = `<text x="${W/2}" y="${H/2}" text-anchor="middle">Keine Daten</text>`; return; }
+  const t1 = Date.now(), t0 = t1 - range * 3600000;
+  const vmax = Math.max(250, ...rd.map(r => r[1])), vmin = 40;
+  const x = ms => L + (ms - t0) / (t1 - t0) * (W - L - R);
+  const y = v => T + (1 - (v - vmin) / (vmax - vmin)) * (H - T - B);
+  let s = `<rect x="${L}" y="${y(t.high)}" width="${W - L - R}" height="${y(t.low) - y(t.high)}" fill="var(--band)"/>`;
+  const ticks = [t.low, t.high, 250].concat(vmax > 300 ? [350] : []);
+  for (const v of ticks) s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-dasharray="3 4"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(v, unit, 1)}</text>`;
+  const step = range <= 6 ? 1 : range <= 24 ? 3 : range <= 168 ? 24 : 48;
+  const first = Math.ceil(t0 / (step * 3600000)) * step * 3600000;
+  for (let m = first; m <= t1; m += step * 3600000) {
+    const dt = new Date(m);
+    s += `<text x="${x(m)}" y="${H - 6}" text-anchor="middle">${step >= 24 ? dt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : dt.getHours() + ':00'}</text>`;
+  }
+  // Linie mit Lücken, wenn > 20 min ohne Wert
+  let path = '', prev = null;
+  for (const [ms, v] of rd) { path += (prev && ms - prev > 20 * 60000 ? 'M' : path ? 'L' : 'M') + x(ms).toFixed(1) + ' ' + y(v).toFixed(1); prev = ms; }
+  s += `<path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`;
+  if (range <= 24) for (const [ms, v] of rd) s += `<circle cx="${x(ms)}" cy="${y(v)}" r="2.2" fill="var(--${v < t.low ? 'low' : v > t.high ? 'high' : 'ok'})"/>`;
+  svg.innerHTML = s + '<g id="hover"></g>';
+  const tip = $('tip');
+  svg.onpointermove = e => {
+    const box = svg.getBoundingClientRect(), px = (e.clientX - box.left) / box.width * W, ms = t0 + (px - L) / (W - L - R) * (t1 - t0);
+    let best = rd[0]; for (const r of rd) if (Math.abs(r[0] - ms) < Math.abs(best[0] - ms)) best = r;
+    $('hover').innerHTML = `<circle cx="${x(best[0])}" cy="${y(best[1])}" r="5" fill="var(--accent)"/>`;
+    tip.style.display = 'block'; tip.textContent = `${fmt(best[1], unit)} · ${new Date(best[0]).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
+    tip.style.left = Math.min(box.width - 150, Math.max(0, e.clientX - box.left - 60)) + 'px'; tip.style.top = (e.clientY - box.top - 36) + 'px';
+  };
+  svg.onpointerleave = () => { tip.style.display = 'none'; $('hover').innerHTML = ''; };
+}
+
+function drawStats(rd, t) {
+  const n = rd.length;
+  if (!n) { for (const id of ['s-avg', 's-gmi', 's-cv', 's-n']) $(id).textContent = '–'; $('tir').innerHTML = ''; $('tir-legend').textContent = ''; return; }
+  const vals = rd.map(r => r[1]), avg = vals.reduce((a, b) => a + b, 0) / n;
+  const sd = Math.sqrt(vals.reduce((a, b) => a + (b - avg) ** 2, 0) / n);
+  const unit = data.unit;
+  $('s-avg').textContent = fmt(avg, unit) + (unit === 'mmol' ? ' mmol/L' : ' mg/dL');
+  $('s-gmi').textContent = (3.31 + 0.02392 * avg).toFixed(1) + ' %';
+  $('s-cv').textContent = (sd / avg * 100).toFixed(0) + ' %';
+  $('s-n').textContent = n;
+  const pct = f => vals.filter(f).length / n * 100;
+  const low = pct(v => v < t.low), high = pct(v => v > t.high), ok = 100 - low - high;
+  $('tir-range').textContent = `(${fmt(t.low, unit)}–${fmt(t.high, unit)})`;
+  $('tir').innerHTML = `<span style="width:${low}%;background:var(--low)"></span><span style="width:${ok}%;background:var(--ok)"></span><span style="width:${high}%;background:var(--high)"></span>`;
+  $('tir-legend').innerHTML = `<span class="low">tief ${low.toFixed(0)} %</span> · <span class="in-range">im Zielbereich ${ok.toFixed(0)} %</span> · <span class="high">hoch ${high.toFixed(0)} %</span>`;
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
